@@ -1,1 +1,1 @@
-geographiclib
+geopy
