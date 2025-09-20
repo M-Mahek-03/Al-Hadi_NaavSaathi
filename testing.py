@@ -1,298 +1,349 @@
-from __future__ import annotations
+"""Testing functionality for geopandas objects."""
 
-import importlib.metadata
-import typing as t
-from contextlib import contextmanager
-from contextlib import ExitStack
-from copy import copy
-from types import TracebackType
-from urllib.parse import urlsplit
+import warnings
 
-import werkzeug.test
-from click.testing import CliRunner
-from click.testing import Result
-from werkzeug.test import Client
-from werkzeug.wrappers import Request as BaseRequest
+import pandas as pd
 
-from .cli import ScriptInfo
-from .sessions import SessionMixin
-
-if t.TYPE_CHECKING:  # pragma: no cover
-    from _typeshed.wsgi import WSGIEnvironment
-    from werkzeug.test import TestResponse
-
-    from .app import Flask
+from geopandas import GeoDataFrame, GeoSeries
+from geopandas.array import GeometryDtype
 
 
-class EnvironBuilder(werkzeug.test.EnvironBuilder):
-    """An :class:`~werkzeug.test.EnvironBuilder`, that takes defaults from the
-    application.
-
-    :param app: The Flask application to configure the environment from.
-    :param path: URL path being requested.
-    :param base_url: Base URL where the app is being served, which
-        ``path`` is relative to. If not given, built from
-        :data:`PREFERRED_URL_SCHEME`, ``subdomain``,
-        :data:`SERVER_NAME`, and :data:`APPLICATION_ROOT`.
-    :param subdomain: Subdomain name to append to :data:`SERVER_NAME`.
-    :param url_scheme: Scheme to use instead of
-        :data:`PREFERRED_URL_SCHEME`.
-    :param json: If given, this is serialized as JSON and passed as
-        ``data``. Also defaults ``content_type`` to
-        ``application/json``.
-    :param args: other positional arguments passed to
-        :class:`~werkzeug.test.EnvironBuilder`.
-    :param kwargs: other keyword arguments passed to
-        :class:`~werkzeug.test.EnvironBuilder`.
-    """
-
-    def __init__(
-        self,
-        app: Flask,
-        path: str = "/",
-        base_url: str | None = None,
-        subdomain: str | None = None,
-        url_scheme: str | None = None,
-        *args: t.Any,
-        **kwargs: t.Any,
-    ) -> None:
-        assert not (base_url or subdomain or url_scheme) or (
-            base_url is not None
-        ) != bool(subdomain or url_scheme), (
-            'Cannot pass "subdomain" or "url_scheme" with "base_url".'
+def _isna(this):
+    """Version of isna that works for both scalars and (Geo)Series."""
+    with warnings.catch_warnings():
+        # GeoSeries.isna will raise a warning about no longer returning True
+        # for empty geometries. This helper is used below always in combination
+        # with an is_empty check to preserve behaviour, and thus we ignore the
+        # warning here to avoid it bubbling up to the user
+        warnings.filterwarnings(
+            "ignore", r"GeoSeries.isna\(\) previously returned", UserWarning
         )
-
-        if base_url is None:
-            http_host = app.config.get("SERVER_NAME") or "localhost"
-            app_root = app.config["APPLICATION_ROOT"]
-
-            if subdomain:
-                http_host = f"{subdomain}.{http_host}"
-
-            if url_scheme is None:
-                url_scheme = app.config["PREFERRED_URL_SCHEME"]
-
-            url = urlsplit(path)
-            base_url = (
-                f"{url.scheme or url_scheme}://{url.netloc or http_host}"
-                f"/{app_root.lstrip('/')}"
-            )
-            path = url.path
-
-            if url.query:
-                path = f"{path}?{url.query}"
-
-        self.app = app
-        super().__init__(path, base_url, *args, **kwargs)
-
-    def json_dumps(self, obj: t.Any, **kwargs: t.Any) -> str:
-        """Serialize ``obj`` to a JSON-formatted string.
-
-        The serialization will be configured according to the config associated
-        with this EnvironBuilder's ``app``.
-        """
-        return self.app.json.dumps(obj, **kwargs)
-
-
-_werkzeug_version = ""
-
-
-def _get_werkzeug_version() -> str:
-    global _werkzeug_version
-
-    if not _werkzeug_version:
-        _werkzeug_version = importlib.metadata.version("werkzeug")
-
-    return _werkzeug_version
-
-
-class FlaskClient(Client):
-    """Works like a regular Werkzeug test client but has knowledge about
-    Flask's contexts to defer the cleanup of the request context until
-    the end of a ``with`` block. For general information about how to
-    use this class refer to :class:`werkzeug.test.Client`.
-
-    .. versionchanged:: 0.12
-       `app.test_client()` includes preset default environment, which can be
-       set after instantiation of the `app.test_client()` object in
-       `client.environ_base`.
-
-    Basic usage is outlined in the :doc:`/testing` chapter.
-    """
-
-    application: Flask
-
-    def __init__(self, *args: t.Any, **kwargs: t.Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.preserve_context = False
-        self._new_contexts: list[t.ContextManager[t.Any]] = []
-        self._context_stack = ExitStack()
-        self.environ_base = {
-            "REMOTE_ADDR": "127.0.0.1",
-            "HTTP_USER_AGENT": f"Werkzeug/{_get_werkzeug_version()}",
-        }
-
-    @contextmanager
-    def session_transaction(
-        self, *args: t.Any, **kwargs: t.Any
-    ) -> t.Iterator[SessionMixin]:
-        """When used in combination with a ``with`` statement this opens a
-        session transaction.  This can be used to modify the session that
-        the test client uses.  Once the ``with`` block is left the session is
-        stored back.
-
-        ::
-
-            with client.session_transaction() as session:
-                session['value'] = 42
-
-        Internally this is implemented by going through a temporary test
-        request context and since session handling could depend on
-        request variables this function accepts the same arguments as
-        :meth:`~flask.Flask.test_request_context` which are directly
-        passed through.
-        """
-        if self._cookies is None:
-            raise TypeError(
-                "Cookies are disabled. Create a client with 'use_cookies=True'."
-            )
-
-        app = self.application
-        ctx = app.test_request_context(*args, **kwargs)
-        self._add_cookies_to_wsgi(ctx.request.environ)
-
-        with ctx:
-            sess = app.session_interface.open_session(app, ctx.request)
-
-        if sess is None:
-            raise RuntimeError("Session backend did not open a session.")
-
-        yield sess
-        resp = app.response_class()
-
-        if app.session_interface.is_null_session(sess):
-            return
-
-        with ctx:
-            app.session_interface.save_session(app, sess, resp)
-
-        self._update_cookies_from_response(
-            ctx.request.host.partition(":")[0],
-            ctx.request.path,
-            resp.headers.getlist("Set-Cookie"),
-        )
-
-    def _copy_environ(self, other: WSGIEnvironment) -> WSGIEnvironment:
-        out = {**self.environ_base, **other}
-
-        if self.preserve_context:
-            out["werkzeug.debug.preserve_context"] = self._new_contexts.append
-
-        return out
-
-    def _request_from_builder_args(
-        self, args: tuple[t.Any, ...], kwargs: dict[str, t.Any]
-    ) -> BaseRequest:
-        kwargs["environ_base"] = self._copy_environ(kwargs.get("environ_base", {}))
-        builder = EnvironBuilder(self.application, *args, **kwargs)
-
-        try:
-            return builder.get_request()
-        finally:
-            builder.close()
-
-    def open(
-        self,
-        *args: t.Any,
-        buffered: bool = False,
-        follow_redirects: bool = False,
-        **kwargs: t.Any,
-    ) -> TestResponse:
-        if args and isinstance(
-            args[0], (werkzeug.test.EnvironBuilder, dict, BaseRequest)
-        ):
-            if isinstance(args[0], werkzeug.test.EnvironBuilder):
-                builder = copy(args[0])
-                builder.environ_base = self._copy_environ(builder.environ_base or {})  # type: ignore[arg-type]
-                request = builder.get_request()
-            elif isinstance(args[0], dict):
-                request = EnvironBuilder.from_environ(
-                    args[0], app=self.application, environ_base=self._copy_environ({})
-                ).get_request()
-            else:
-                # isinstance(args[0], BaseRequest)
-                request = copy(args[0])
-                request.environ = self._copy_environ(request.environ)
+        if hasattr(this, "isna"):
+            return this.isna()
+        elif hasattr(this, "isnull"):
+            return this.isnull()
         else:
-            # request is None
-            request = self._request_from_builder_args(args, kwargs)
-
-        # Pop any previously preserved contexts. This prevents contexts
-        # from being preserved across redirects or multiple requests
-        # within a single block.
-        self._context_stack.close()
-
-        response = super().open(
-            request,
-            buffered=buffered,
-            follow_redirects=follow_redirects,
-        )
-        response.json_module = self.application.json  # type: ignore[assignment]
-
-        # Re-push contexts that were preserved during the request.
-        for cm in self._new_contexts:
-            self._context_stack.enter_context(cm)
-
-        self._new_contexts.clear()
-        return response
-
-    def __enter__(self) -> FlaskClient:
-        if self.preserve_context:
-            raise RuntimeError("Cannot nest client invocations")
-        self.preserve_context = True
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type | None,
-        exc_value: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None:
-        self.preserve_context = False
-        self._context_stack.close()
+            return pd.isnull(this)
 
 
-class FlaskCliRunner(CliRunner):
-    """A :class:`~click.testing.CliRunner` for testing a Flask app's
-    CLI commands. Typically created using
-    :meth:`~flask.Flask.test_cli_runner`. See :ref:`testing-cli`.
+def _geom_equals_mask(this, that):
     """
+    Test for geometric equality. Empty or missing geometries are considered
+    equal.
 
-    def __init__(self, app: Flask, **kwargs: t.Any) -> None:
-        self.app = app
-        super().__init__(**kwargs)
+    Parameters
+    ----------
+    this, that : arrays of Geo objects (or anything that has an `is_empty`
+                 attribute)
 
-    def invoke(  # type: ignore
-        self, cli: t.Any = None, args: t.Any = None, **kwargs: t.Any
-    ) -> Result:
-        """Invokes a CLI command in an isolated environment. See
-        :meth:`CliRunner.invoke <click.testing.CliRunner.invoke>` for
-        full method documentation. See :ref:`testing-cli` for examples.
+    Returns
+    -------
+    Series
+        boolean Series, True if geometries in left equal geometries in right
+    """
+    return (
+        this.geom_equals(that)
+        | (this.is_empty & that.is_empty)
+        | (_isna(this) & _isna(that))
+    )
 
-        If the ``obj`` argument is not given, passes an instance of
-        :class:`~flask.cli.ScriptInfo` that knows how to load the Flask
-        app being tested.
 
-        :param cli: Command object to invoke. Default is the app's
-            :attr:`~flask.app.Flask.cli` group.
-        :param args: List of strings to invoke the command with.
+def geom_equals(this, that):
+    """
+    Test for geometric equality. Empty or missing geometries are considered
+    equal.
 
-        :return: a :class:`~click.testing.Result` object.
-        """
-        if cli is None:
-            cli = self.app.cli
+    Parameters
+    ----------
+    this, that : arrays of Geo objects (or anything that has an `is_empty`
+                 attribute)
 
-        if "obj" not in kwargs:
-            kwargs["obj"] = ScriptInfo(create_app=lambda: self.app)
+    Returns
+    -------
+    bool
+        True if all geometries in left equal geometries in right
+    """
+    return _geom_equals_mask(this, that).all()
 
-        return super().invoke(cli, args, **kwargs)
+
+def _geom_almost_equals_mask(this, that):
+    """
+    Test for 'almost' geometric equality. Empty or missing geometries
+    considered equal.
+
+    This method allows small difference in the coordinates, but this
+    requires coordinates be in the same order for all components of a geometry.
+
+    Parameters
+    ----------
+    this, that : arrays of Geo objects
+
+    Returns
+    -------
+    Series
+        boolean Series, True if geometries in left almost equal geometries in right
+    """
+    return (
+        this.geom_equals_exact(that, tolerance=0.5 * 10 ** (-6))
+        | (this.is_empty & that.is_empty)
+        | (_isna(this) & _isna(that))
+    )
+
+
+def geom_almost_equals(this, that):
+    """
+    Test for 'almost' geometric equality. Empty or missing geometries
+    considered equal.
+
+    This method allows small difference in the coordinates, but this
+    requires coordinates be in the same order for all components of a geometry.
+
+    Parameters
+    ----------
+    this, that : arrays of Geo objects (or anything that has an `is_empty`
+                 property)
+
+    Returns
+    -------
+    bool
+        True if all geometries in left almost equal geometries in right
+    """
+    if isinstance(this, GeoDataFrame) and isinstance(that, GeoDataFrame):
+        this = this.geometry
+        that = that.geometry
+
+    return _geom_almost_equals_mask(this, that).all()
+
+
+def assert_geoseries_equal(
+    left,
+    right,
+    check_dtype=True,
+    check_index_type=False,
+    check_series_type=True,
+    check_less_precise=False,
+    check_geom_type=False,
+    check_crs=True,
+    normalize=False,
+):
+    """
+    Test util for checking that two GeoSeries are equal.
+
+    Parameters
+    ----------
+    left, right : two GeoSeries
+    check_dtype : bool, default False
+        If True, check geo dtype [only included so it's a drop-in replacement
+        for assert_series_equal].
+    check_index_type : bool, default False
+        Check that index types are equal.
+    check_series_type : bool, default True
+        Check that both are same type (*and* are GeoSeries). If False,
+        will attempt to convert both into GeoSeries.
+    check_less_precise : bool, default False
+        If True, use geom_equals_exact with relative error of 0.5e-6.
+        If False, use geom_equals.
+    check_geom_type : bool, default False
+        If True, check that all the geom types are equal.
+    check_crs: bool, default True
+        If `check_series_type` is True, then also check that the
+        crs matches.
+    normalize: bool, default False
+        If True, normalize the geometries before comparing equality.
+        Typically useful with ``check_less_precise=True``, which uses
+        ``geom_equals_exact`` and requires exact coordinate order.
+    """
+    assert len(left) == len(right), f"{len(left)} != {len(right)}"
+
+    if check_dtype:
+        msg = "dtype should be a GeometryDtype, got {0}"
+        assert isinstance(left.dtype, GeometryDtype), msg.format(left.dtype)
+        assert isinstance(right.dtype, GeometryDtype), msg.format(left.dtype)
+
+    if check_index_type:
+        assert isinstance(left.index, type(right.index))
+
+    if check_series_type:
+        assert isinstance(left, GeoSeries)
+        assert isinstance(left, type(right))
+
+        if check_crs:
+            assert left.crs == right.crs
+    else:
+        if not isinstance(left, GeoSeries):
+            left = GeoSeries(left)
+        if not isinstance(right, GeoSeries):
+            right = GeoSeries(right, index=left.index)
+
+    assert left.index.equals(right.index), f"index: {left.index} != {right.index}"
+
+    if check_geom_type:
+        assert (left.geom_type == right.geom_type).all(), (
+            f"type: {left.geom_type} != {right.geom_type}"
+        )
+
+    if normalize:
+        left = GeoSeries(left.array.normalize())
+        right = GeoSeries(right.array.normalize())
+
+    if not check_crs:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", "CRS mismatch", UserWarning)
+            _check_equality(left, right, check_less_precise)
+    else:
+        _check_equality(left, right, check_less_precise)
+
+
+def _truncated_string(geom):
+    """Truncate WKT repr of geom."""
+    s = str(geom)
+    if len(s) > 100:
+        return s[:100] + "..."
+    else:
+        return s
+
+
+def _check_equality(left, right, check_less_precise):
+    assert_error_message = (
+        "{0} out of {1} geometries are not {3}equal.\n"
+        "Indices where geometries are not {3}equal: {2} \n"
+        "The first not {3}equal geometry:\n"
+        "Left: {4}\n"
+        "Right: {5}\n"
+    )
+    if check_less_precise:
+        precise = "almost "
+        equal = _geom_almost_equals_mask(left, right)
+    else:
+        precise = ""
+        equal = _geom_equals_mask(left, right)
+
+    if not equal.all():
+        unequal_left_geoms = left[~equal]
+        unequal_right_geoms = right[~equal]
+        raise AssertionError(
+            assert_error_message.format(
+                len(unequal_left_geoms),
+                len(left),
+                unequal_left_geoms.index.to_list(),
+                precise,
+                _truncated_string(unequal_left_geoms.iloc[0]),
+                _truncated_string(unequal_right_geoms.iloc[0]),
+            )
+        )
+
+
+def assert_geodataframe_equal(
+    left,
+    right,
+    check_dtype=True,
+    check_index_type="equiv",
+    check_column_type="equiv",
+    check_frame_type=True,
+    check_like=False,
+    check_less_precise=False,
+    check_geom_type=False,
+    check_crs=True,
+    normalize=False,
+):
+    """Check that two GeoDataFrames are equal.
+
+    Parameters
+    ----------
+    left, right : two GeoDataFrames
+    check_dtype : bool, default True
+        Whether to check the DataFrame dtype is identical.
+    check_index_type, check_column_type : bool, default 'equiv'
+        Check that index types are equal.
+    check_frame_type : bool, default True
+        Check that both are same type (*and* are GeoDataFrames). If False,
+        will attempt to convert both into GeoDataFrame.
+    check_like : bool, default False
+        If true, ignore the order of rows & columns
+    check_less_precise : bool, default False
+        If True, use geom_equals_exact. if False, use geom_equals.
+    check_geom_type : bool, default False
+        If True, check that all the geom types are equal.
+    check_crs: bool, default True
+        If `check_frame_type` is True, then also check that the
+        crs matches.
+    normalize: bool, default False
+        If True, normalize the geometries before comparing equality.
+        Typically useful with ``check_less_precise=True``, which uses
+        ``geom_equals_exact`` and requires exact coordinate order.
+    """
+    try:
+        # added from pandas 0.20
+        from pandas.testing import assert_frame_equal, assert_index_equal
+    except ImportError:
+        from pandas.util.testing import assert_frame_equal, assert_index_equal
+
+    # instance validation
+    if check_frame_type:
+        assert isinstance(left, GeoDataFrame)
+        assert isinstance(left, type(right))
+
+        if check_crs:
+            # allow if neither left and right has an active geometry column
+            if (
+                left._geometry_column_name is None
+                and right._geometry_column_name is None
+            ):
+                pass
+            elif (
+                left._geometry_column_name not in left.columns
+                and right._geometry_column_name not in right.columns
+            ):
+                pass
+            # no crs can be either None or {}
+            elif not left.crs and not right.crs:
+                pass
+            else:
+                assert left.crs == right.crs
+    else:
+        if not isinstance(left, GeoDataFrame):
+            left = GeoDataFrame(left)
+        if not isinstance(right, GeoDataFrame):
+            right = GeoDataFrame(right)
+
+    # shape comparison
+    assert left.shape == right.shape, (
+        f"GeoDataFrame shape mismatch, left: {left.shape!r}, right: {right.shape!r}.\n"
+        f"Left columns: {left.columns!r}, right columns: {right.columns!r}"
+    )
+
+    if check_like:
+        left = left.reindex_like(right)
+
+    # column comparison
+    assert_index_equal(
+        left.columns, right.columns, exact=check_column_type, obj="GeoDataFrame.columns"
+    )
+
+    # geometry comparison
+    for col, dtype in left.dtypes.items():
+        if isinstance(dtype, GeometryDtype):
+            assert_geoseries_equal(
+                left[col],
+                right[col],
+                normalize=normalize,
+                check_dtype=check_dtype,
+                check_less_precise=check_less_precise,
+                check_geom_type=check_geom_type,
+                check_crs=check_crs,
+            )
+
+    # ensure the active geometry column is the same
+    assert left._geometry_column_name == right._geometry_column_name
+
+    # drop geometries and check remaining columns
+    left2 = left.select_dtypes(exclude="geometry")
+    right2 = right.select_dtypes(exclude="geometry")
+    assert_frame_equal(
+        left2,
+        right2,
+        check_dtype=check_dtype,
+        check_index_type=check_index_type,
+        check_column_type=check_column_type,
+        obj="GeoDataFrame",
+    )
