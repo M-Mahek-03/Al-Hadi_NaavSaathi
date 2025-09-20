@@ -1,123 +1,419 @@
-Metadata-Version: 2.3
-Name: aiohappyeyeballs
-Version: 2.6.1
-Summary: Happy Eyeballs for asyncio
-License: PSF-2.0
-Author: J. Nick Koston
-Author-email: nick@koston.org
-Requires-Python: >=3.9
+Metadata-Version: 2.1
+Name: backoff
+Version: 2.2.1
+Summary: Function decoration for backoff and retry
+Home-page: https://github.com/litl/backoff
+License: MIT
+Keywords: retry,backoff,decorators
+Author: Bob Green
+Author-email: rgreen@aquent.com
+Requires-Python: >=3.7,<4.0
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
 Classifier: Natural Language :: English
 Classifier: Operating System :: OS Independent
-Classifier: Topic :: Software Development :: Libraries
+Classifier: Programming Language :: Python
 Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
-Classifier: Programming Language :: Python :: 3.11
-Classifier: Programming Language :: Python :: 3.12
-Classifier: Programming Language :: Python :: 3.13
-Classifier: License :: OSI Approved :: Python Software Foundation License
-Project-URL: Bug Tracker, https://github.com/aio-libs/aiohappyeyeballs/issues
-Project-URL: Changelog, https://github.com/aio-libs/aiohappyeyeballs/blob/main/CHANGELOG.md
-Project-URL: Documentation, https://aiohappyeyeballs.readthedocs.io
-Project-URL: Repository, https://github.com/aio-libs/aiohappyeyeballs
-Description-Content-Type: text/markdown
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Utilities
+Project-URL: Repository, https://github.com/litl/backoff
+Description-Content-Type: text/x-rst
 
-# aiohappyeyeballs
+backoff
+=======
 
-<p align="center">
-  <a href="https://github.com/aio-libs/aiohappyeyeballs/actions/workflows/ci.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/github/actions/workflow/status/aio-libs/aiohappyeyeballs/ci-cd.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status" >
-  </a>
-  <a href="https://aiohappyeyeballs.readthedocs.io">
-    <img src="https://img.shields.io/readthedocs/aiohappyeyeballs.svg?logo=read-the-docs&logoColor=fff&style=flat-square" alt="Documentation Status">
-  </a>
-  <a href="https://codecov.io/gh/aio-libs/aiohappyeyeballs">
-    <img src="https://img.shields.io/codecov/c/github/aio-libs/aiohappyeyeballs.svg?logo=codecov&logoColor=fff&style=flat-square" alt="Test coverage percentage">
-  </a>
-</p>
-<p align="center">
-  <a href="https://python-poetry.org/">
-    <img src="https://img.shields.io/badge/packaging-poetry-299bd7?style=flat-square&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAASCAYAAABrXO8xAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAJJSURBVHgBfZLPa1NBEMe/s7tNXoxW1KJQKaUHkXhQvHgW6UHQQ09CBS/6V3hKc/AP8CqCrUcpmop3Cx48eDB4yEECjVQrlZb80CRN8t6OM/teagVxYZi38+Yz853dJbzoMV3MM8cJUcLMSUKIE8AzQ2PieZzFxEJOHMOgMQQ+dUgSAckNXhapU/NMhDSWLs1B24A8sO1xrN4NECkcAC9ASkiIJc6k5TRiUDPhnyMMdhKc+Zx19l6SgyeW76BEONY9exVQMzKExGKwwPsCzza7KGSSWRWEQhyEaDXp6ZHEr416ygbiKYOd7TEWvvcQIeusHYMJGhTwF9y7sGnSwaWyFAiyoxzqW0PM/RjghPxF2pWReAowTEXnDh0xgcLs8l2YQmOrj3N7ByiqEoH0cARs4u78WgAVkoEDIDoOi3AkcLOHU60RIg5wC4ZuTC7FaHKQm8Hq1fQuSOBvX/sodmNJSB5geaF5CPIkUeecdMxieoRO5jz9bheL6/tXjrwCyX/UYBUcjCaWHljx1xiX6z9xEjkYAzbGVnB8pvLmyXm9ep+W8CmsSHQQY77Zx1zboxAV0w7ybMhQmfqdmmw3nEp1I0Z+FGO6M8LZdoyZnuzzBdjISicKRnpxzI9fPb+0oYXsNdyi+d3h9bm9MWYHFtPeIZfLwzmFDKy1ai3p+PDls1Llz4yyFpferxjnyjJDSEy9CaCx5m2cJPerq6Xm34eTrZt3PqxYO1XOwDYZrFlH1fWnpU38Y9HRze3lj0vOujZcXKuuXm3jP+s3KbZVra7y2EAAAAAASUVORK5CYII=" alt="Poetry">
-  </a>
-  <a href="https://github.com/astral-sh/ruff">
-    <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff">
-  </a>
-  <a href="https://github.com/pre-commit/pre-commit">
-    <img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=flat-square" alt="pre-commit">
-  </a>
-</p>
-<p align="center">
-  <a href="https://pypi.org/project/aiohappyeyeballs/">
-    <img src="https://img.shields.io/pypi/v/aiohappyeyeballs.svg?logo=python&logoColor=fff&style=flat-square" alt="PyPI Version">
-  </a>
-  <img src="https://img.shields.io/pypi/pyversions/aiohappyeyeballs.svg?style=flat-square&logo=python&amp;logoColor=fff" alt="Supported Python versions">
-  <img src="https://img.shields.io/pypi/l/aiohappyeyeballs.svg?style=flat-square" alt="License">
-</p>
+.. image:: https://travis-ci.org/litl/backoff.svg
+    :target: https://travis-ci.org/litl/backoff
+.. image:: https://coveralls.io/repos/litl/backoff/badge.svg
+    :target: https://coveralls.io/r/litl/backoff?branch=python-3
+.. image:: https://github.com/litl/backoff/workflows/CodeQL/badge.svg
+    :target: https://github.com/litl/backoff/actions/workflows/codeql-analysis.yml
+.. image:: https://img.shields.io/pypi/v/backoff.svg
+    :target: https://pypi.python.org/pypi/backoff
+.. image:: https://img.shields.io/github/license/litl/backoff
+    :target: https://github.com/litl/backoff/blob/master/LICENSE
 
----
+**Function decoration for backoff and retry**
 
-**Documentation**: <a href="https://aiohappyeyeballs.readthedocs.io" target="_blank">https://aiohappyeyeballs.readthedocs.io </a>
+This module provides function decorators which can be used to wrap a
+function such that it will be retried until some condition is met. It
+is meant to be of use when accessing unreliable resources with the
+potential for intermittent failures i.e. network resources and external
+APIs. Somewhat more generally, it may also be of use for dynamically
+polling resources for externally generated content.
 
-**Source Code**: <a href="https://github.com/aio-libs/aiohappyeyeballs" target="_blank">https://github.com/aio-libs/aiohappyeyeballs </a>
+Decorators support both regular functions for synchronous code and
+`asyncio <https://docs.python.org/3/library/asyncio.html>`__'s coroutines
+for asynchronous code.
 
----
+Examples
+========
 
-[Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs)
-([RFC 8305](https://www.rfc-editor.org/rfc/rfc8305.html))
+Since Kenneth Reitz's `requests <http://python-requests.org>`_ module
+has become a defacto standard for synchronous HTTP clients in Python,
+networking examples below are written using it, but it is in no way required
+by the backoff module.
 
-## Use case
+@backoff.on_exception
+---------------------
 
-This library exists to allow connecting with
-[Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs)
-([RFC 8305](https://www.rfc-editor.org/rfc/rfc8305.html))
-when you
-already have a list of addrinfo and not a DNS name.
+The ``on_exception`` decorator is used to retry when a specified exception
+is raised. Here's an example using exponential backoff when any
+``requests`` exception is raised:
 
-The stdlib version of `loop.create_connection()`
-will only work when you pass in an unresolved name which
-is not a good fit when using DNS caching or resolving
-names via another method such as `zeroconf`.
+.. code-block:: python
 
-## Installation
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException)
+    def get_url(url):
+        return requests.get(url)
 
-Install this via pip (or your favourite package manager):
+The decorator will also accept a tuple of exceptions for cases where
+the same backoff behavior is desired for more than one exception type:
 
-`pip install aiohappyeyeballs`
+.. code-block:: python
 
-## License
+    @backoff.on_exception(backoff.expo,
+                          (requests.exceptions.Timeout,
+                           requests.exceptions.ConnectionError))
+    def get_url(url):
+        return requests.get(url)
 
-[aiohappyeyeballs is licensed under the same terms as cpython itself.](https://github.com/python/cpython/blob/main/LICENSE)
+**Give Up Conditions**
 
-## Example usage
+Optional keyword arguments can specify conditions under which to give
+up.
 
-```python
+The keyword argument ``max_time`` specifies the maximum amount
+of total time in seconds that can elapse before giving up.
 
-addr_infos = await loop.getaddrinfo("example.org", 80)
+.. code-block:: python
 
-socket = await start_connection(addr_infos)
-socket = await start_connection(addr_infos, local_addr_infos=local_addr_infos, happy_eyeballs_delay=0.2)
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException,
+                          max_time=60)
+    def get_url(url):
+        return requests.get(url)
 
-transport, protocol = await loop.create_connection(
-    MyProtocol, sock=socket, ...)
 
-# Remove the first address for each family from addr_info
-pop_addr_infos_interleave(addr_info, 1)
+Keyword argument ``max_tries`` specifies the maximum number of calls
+to make to the target function before giving up.
 
-# Remove all matching address from addr_info
-remove_addr_infos(addr_info, "dead::beef::")
+.. code-block:: python
 
-# Convert a local_addr to local_addr_infos
-local_addr_infos = addr_to_addr_infos(("127.0.0.1",0))
-```
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException,
+                          max_tries=8,
+                          jitter=None)
+    def get_url(url):
+        return requests.get(url)
 
-## Credits
 
-This package contains code from cpython and is licensed under the same terms as cpython itself.
+In some cases the raised exception instance itself may need to be
+inspected in order to determine if it is a retryable condition. The
+``giveup`` keyword arg can be used to specify a function which accepts
+the exception and returns a truthy value if the exception should not
+be retried:
 
-This package was created with
-[Copier](https://copier.readthedocs.io/) and the
-[browniebroke/pypackage-template](https://github.com/browniebroke/pypackage-template)
-project template.
+.. code-block:: python
+
+    def fatal_code(e):
+        return 400 <= e.response.status_code < 500
+
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException,
+                          max_time=300,
+                          giveup=fatal_code)
+    def get_url(url):
+        return requests.get(url)
+
+By default, when a give up event occurs, the exception in question is reraised
+and so code calling an `on_exception`-decorated function may still
+need to do exception handling. This behavior can optionally be disabled
+using the `raise_on_giveup` keyword argument.
+
+In the code below, `requests.exceptions.RequestException` will not be raised
+when giveup occurs. Note that the decorated function will return `None` in this
+case, regardless of the logic in the `on_exception` handler.
+
+.. code-block:: python
+
+    def fatal_code(e):
+        return 400 <= e.response.status_code < 500
+
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException,
+                          max_time=300,
+                          raise_on_giveup=False,
+                          giveup=fatal_code)
+    def get_url(url):
+        return requests.get(url)
+
+This is useful for non-mission critical code where you still wish to retry
+the code inside of `backoff.on_exception` but wish to proceed with execution
+even if all retries fail.
+
+@backoff.on_predicate
+---------------------
+
+The ``on_predicate`` decorator is used to retry when a particular
+condition is true of the return value of the target function.  This may
+be useful when polling a resource for externally generated content.
+
+Here's an example which uses a fibonacci sequence backoff when the
+return value of the target function is the empty list:
+
+.. code-block:: python
+
+    @backoff.on_predicate(backoff.fibo, lambda x: x == [], max_value=13)
+    def poll_for_messages(queue):
+        return queue.get()
+
+Extra keyword arguments are passed when initializing the
+wait generator, so the ``max_value`` param above is passed as a keyword
+arg when initializing the fibo generator.
+
+When not specified, the predicate param defaults to the falsey test,
+so the above can more concisely be written:
+
+.. code-block:: python
+
+    @backoff.on_predicate(backoff.fibo, max_value=13)
+    def poll_for_message(queue):
+        return queue.get()
+
+More simply, a function which continues polling every second until it
+gets a non-falsey result could be defined like like this:
+
+.. code-block:: python
+
+    @backoff.on_predicate(backoff.constant, jitter=None, interval=1)
+    def poll_for_message(queue):
+        return queue.get()
+
+The jitter is disabled in order to keep the polling frequency fixed.  
+
+@backoff.runtime
+----------------
+
+You can also use the ``backoff.runtime`` generator to make use of the
+return value or thrown exception of the decorated method.
+
+For example, to use the value in the ``Retry-After`` header of the response:
+
+.. code-block:: python
+
+    @backoff.on_predicate(
+        backoff.runtime,
+        predicate=lambda r: r.status_code == 429,
+        value=lambda r: int(r.headers.get("Retry-After")),
+        jitter=None,
+    )
+    def get_url():
+        return requests.get(url)
+
+Jitter
+------
+
+A jitter algorithm can be supplied with the ``jitter`` keyword arg to
+either of the backoff decorators. This argument should be a function
+accepting the original unadulterated backoff value and returning it's
+jittered counterpart.
+
+As of version 1.2, the default jitter function ``backoff.full_jitter``
+implements the 'Full Jitter' algorithm as defined in the AWS
+Architecture Blog's `Exponential Backoff And Jitter
+<https://www.awsarchitectureblog.com/2015/03/backoff.html>`_ post.
+Note that with this algorithm, the time yielded by the wait generator
+is actually the *maximum* amount of time to wait.
+
+Previous versions of backoff defaulted to adding some random number of
+milliseconds (up to 1s) to the raw sleep value. If desired, this
+behavior is now available as ``backoff.random_jitter``.
+
+Using multiple decorators
+-------------------------
+
+The backoff decorators may also be combined to specify different
+backoff behavior for different cases:
+
+.. code-block:: python
+
+    @backoff.on_predicate(backoff.fibo, max_value=13)
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.HTTPError,
+                          max_time=60)
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.Timeout,
+                          max_time=300)
+    def poll_for_message(queue):
+        return queue.get()
+
+
+Runtime Configuration
+---------------------
+
+The decorator functions ``on_exception`` and ``on_predicate`` are
+generally evaluated at import time. This is fine when the keyword args
+are passed as constant values, but suppose we want to consult a
+dictionary with configuration options that only become available at
+runtime. The relevant values are not available at import time. Instead,
+decorator functions can be passed callables which are evaluated at
+runtime to obtain the value:
+
+.. code-block:: python
+
+    def lookup_max_time():
+        # pretend we have a global reference to 'app' here
+        # and that it has a dictionary-like 'config' property
+        return app.config["BACKOFF_MAX_TIME"]
+
+    @backoff.on_exception(backoff.expo,
+                          ValueError,
+                          max_time=lookup_max_time)
+
+Event handlers
+--------------
+
+Both backoff decorators optionally accept event handler functions
+using the keyword arguments ``on_success``, ``on_backoff``, and ``on_giveup``.
+This may be useful in reporting statistics or performing other custom
+logging.
+
+Handlers must be callables with a unary signature accepting a dict
+argument. This dict contains the details of the invocation. Valid keys
+include:
+
+* *target*: reference to the function or method being invoked
+* *args*: positional arguments to func
+* *kwargs*: keyword arguments to func
+* *tries*: number of invocation tries so far
+* *elapsed*: elapsed time in seconds so far
+* *wait*: seconds to wait (``on_backoff`` handler only)
+* *value*: value triggering backoff (``on_predicate`` decorator only)
+
+A handler which prints the details of the backoff event could be
+implemented like so:
+
+.. code-block:: python
+
+    def backoff_hdlr(details):
+        print ("Backing off {wait:0.1f} seconds after {tries} tries "
+               "calling function {target} with args {args} and kwargs "
+               "{kwargs}".format(**details))
+
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException,
+                          on_backoff=backoff_hdlr)
+    def get_url(url):
+        return requests.get(url)
+
+**Multiple handlers per event type**
+
+In all cases, iterables of handler functions are also accepted, which
+are called in turn. For example, you might provide a simple list of
+handler functions as the value of the ``on_backoff`` keyword arg:
+
+.. code-block:: python
+
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException,
+                          on_backoff=[backoff_hdlr1, backoff_hdlr2])
+    def get_url(url):
+        return requests.get(url)
+
+**Getting exception info**
+
+In the case of the ``on_exception`` decorator, all ``on_backoff`` and
+``on_giveup`` handlers are called from within the except block for the
+exception being handled. Therefore exception info is available to the
+handler functions via the python standard library, specifically
+``sys.exc_info()`` or the ``traceback`` module. The exception is also
+available at the *exception* key in the `details` dict passed to the
+handlers.
+
+Asynchronous code
+-----------------
+
+Backoff supports asynchronous execution in Python 3.5 and above.
+
+To use backoff in asynchronous code based on
+`asyncio <https://docs.python.org/3/library/asyncio.html>`__
+you simply need to apply ``backoff.on_exception`` or ``backoff.on_predicate``
+to coroutines.
+You can also use coroutines for the ``on_success``, ``on_backoff``, and
+``on_giveup`` event handlers, with the interface otherwise being identical.
+
+The following examples use `aiohttp <https://aiohttp.readthedocs.io/>`__
+asynchronous HTTP client/server library.
+
+.. code-block:: python
+
+    @backoff.on_exception(backoff.expo, aiohttp.ClientError, max_time=60)
+    async def get_url(url):
+        async with aiohttp.ClientSession(raise_for_status=True) as session:
+            async with session.get(url) as response:
+                return await response.text()
+
+Logging configuration
+---------------------
+
+By default, backoff and retry attempts are logged to the 'backoff'
+logger. By default, this logger is configured with a NullHandler, so
+there will be nothing output unless you configure a handler.
+Programmatically, this might be accomplished with something as simple
+as:
+
+.. code-block:: python
+
+    logging.getLogger('backoff').addHandler(logging.StreamHandler())
+
+The default logging level is INFO, which corresponds to logging
+anytime a retry event occurs. If you would instead like to log
+only when a giveup event occurs, set the logger level to ERROR.
+
+.. code-block:: python
+
+    logging.getLogger('backoff').setLevel(logging.ERROR)
+
+It is also possible to specify an alternate logger with the ``logger``
+keyword argument.  If a string value is specified the logger will be
+looked up by name.
+
+.. code-block:: python
+
+   @backoff.on_exception(backoff.expo,
+                         requests.exceptions.RequestException,
+			 logger='my_logger')
+   # ...
+
+It is also supported to specify a Logger (or LoggerAdapter) object
+directly.
+
+.. code-block:: python
+
+    my_logger = logging.getLogger('my_logger')
+    my_handler = logging.StreamHandler()
+    my_logger.addHandler(my_handler)
+    my_logger.setLevel(logging.ERROR)
+
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException,
+			  logger=my_logger)
+    # ...
+
+Default logging can be disabled all together by specifying
+``logger=None``. In this case, if desired alternative logging behavior
+could be defined by using custom event handlers.
 
